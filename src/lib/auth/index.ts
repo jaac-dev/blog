@@ -1,8 +1,10 @@
+"server-only";
+
 import { User } from "@prisma/client";
 import { getIronSession } from "iron-session";
 import bcrypt from "bcrypt";
 import { cookies } from "next/headers";
-import { prisma } from "./prisma";
+import { prisma } from "../prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 export type Handler = (req: NextRequest) => Promise<void> | void;
@@ -20,30 +22,9 @@ export async function getSession() {
   });
 }
 
-export async function register(
-  username: string,
-  password: string
-): Promise<User | null> {
-  if ((await prisma.user.count({ where: { username } })) > 0) return null;
-
-  const hash = await bcrypt.hash(password, SALT_LENGTH);
-  const user = await prisma.user.create({
-    data: {
-      username,
-      password: hash,
-    },
-  });
-
-  const session = await getSession();
-  session.id = user.id;
-  await session.save();
-
-  return user;
-}
-
 export async function login(
-  username: string,
-  password: string
+  id: number,
+  username: string
 ): Promise<User | null> {
   const user = await prisma.user.findFirst({
     where: {
@@ -51,7 +32,16 @@ export async function login(
     },
   });
 
-  if (!user || !(await bcrypt.compare(password, user.password))) return null;
+  if (!user) {
+    const user = await prisma.user.create({
+      data: {
+        githubId: id,
+        githubUsername: username,
+      },
+    });
+
+    return;
+  }
 
   const session = await getSession();
   session.id = user.id;
