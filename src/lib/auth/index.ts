@@ -2,14 +2,11 @@
 
 import { User } from "@prisma/client";
 import { getIronSession } from "iron-session";
-import bcrypt from "bcrypt";
 import { cookies } from "next/headers";
 import { prisma } from "../prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 export type Handler = (req: NextRequest) => Promise<void> | void;
-
-const SALT_LENGTH = 16;
 
 export type Session = {
   id: number;
@@ -23,25 +20,20 @@ export async function getSession() {
 }
 
 export async function login(
-  id: number,
-  username: string
+  githubId: number
 ): Promise<User | null> {
-  const user = await prisma.user.findFirst({
+  let user = await prisma.user.findFirst({
     where: {
-      username,
+      githubId,
     },
   });
 
-  if (!user) {
-    const user = await prisma.user.create({
+  if (!user)
+    user = await prisma.user.create({
       data: {
-        githubId: id,
-        githubUsername: username,
+        githubId,
       },
     });
-
-    return;
-  }
 
   const session = await getSession();
   session.id = user.id;
@@ -50,9 +42,9 @@ export async function login(
   return user;
 }
 
-export async function logout() {
+export async function logout(): Promise<void> {
   const session = await getSession();
-  await session.destroy();
+  session.destroy();
 }
 
 export function protect(inner: Handler): Handler {
